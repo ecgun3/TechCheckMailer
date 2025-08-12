@@ -140,7 +140,13 @@
     }
 
     function showResults(data) {
-      renderCategories(data?.meta?.company_technologies);
+      // also show raw list of technologies if categorization is empty
+      const cats = data?.meta?.company_technologies;
+      if (!cats || !Object.keys(cats).length) {
+        renderCategories({ all: (data.technologies || []) });
+      } else {
+        renderCategories(cats);
+      }
       renderContexts(data?.meta?.matched_contexts);
       renderPlatforms(data.platforms_found);
       renderTemplates(data?.meta?.generated_templates);

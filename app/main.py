@@ -11,7 +11,7 @@ import httpx
 
 from app.models import AnalyzeRequest, AnalyzeResponse
 from app.services.builtwith_client import fetch_technologies
-from app.services.holehe_client import check_email_platforms
+from app.services.holehe_client import check_email_platforms, debug_holehe
 from app.email_drafter import generate_email_draft, SmartEmailDrafter
 from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, HOLEHE_TIMEOUT, get_builtwith_api_url
 
@@ -73,6 +73,15 @@ async def test_api():
         }
     except Exception as e:  # noqa: BLE001
         return {"error": str(e), "api_key_present": True, "api_key_length": len(api_key)}
+
+
+@app.get("/test-holehe")
+async def test_holehe(email: str = "test@gmail.com"):
+    try:
+        details = await debug_holehe(email)
+        return details
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
@@ -138,5 +147,6 @@ async def analyze(body: AnalyzeRequest):
             "email_platforms": platforms,
             "matched_contexts": matched_contexts,
             "generated_templates": generated_templates,
+            "technologies_count": len(technologies),
         },
     )
