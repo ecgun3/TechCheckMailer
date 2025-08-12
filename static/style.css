@@ -50,3 +50,4 @@ button:hover { background: #2f4ce0; }
 .tech-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #0f1430; border: 1px solid #2a355c; color: #dfe6ff; font-size: 12px; }
 .hidden { display: none; }
+.muted { color: #9aa4bf; }

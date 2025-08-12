@@ -127,6 +127,14 @@
     }
 
     function renderPlatforms(platforms) {
+      platformListEl.innerHTML = '';
+      if (!platforms || !platforms.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No platforms detected';
+        li.className = 'muted';
+        platformListEl.appendChild(li);
+        return;
+      }
       (platforms || []).forEach(p => {
         const li = document.createElement('li');
         li.textContent = p;
@@ -172,8 +180,8 @@
       }
       renderContexts(data?.meta?.matched_contexts);
       renderPlatforms(data.platforms_found);
-      renderTemplates(data?.meta?.generated_templates);
-      applySelectedTemplate(data?.meta?.generated_templates);
+      renderTemplates((data?.meta?.generated_templates || []).filter(t => t.context !== 'general'));
+      applySelectedTemplate((data?.meta?.generated_templates || []).filter(t => t.context !== 'general'));
       resultsEl.classList.remove('hidden');
     }
 

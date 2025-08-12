@@ -75,6 +75,36 @@ async def test_api():
         return {"error": str(e), "api_key_present": True, "api_key_length": len(api_key)}
 
 
+@app.get("/debug-builtwith/{domain}")
+async def debug_builtwith(domain: str):
+    api_key = get_builtwith_api_key()
+    if not api_key:
+        return {"error": "BUILTWITH_API_KEY missing", "api_key_present": False, "api_key_length": 0}
+    # Force the free endpoint to remove ambiguity
+    base = "https://api.builtwith.com/free1/api.json"
+    url = f"{base}?KEY={api_key}&LOOKUP={domain}"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=30.0)
+        # Log details server-side as well
+        logger.info("[DebugBuiltWith] GET %s -> %s", url, resp.status_code)
+        body = None
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"text": resp.text[:1000]}
+        return {
+            "api_key_first_10": api_key[:10],
+            "url_called": url,
+            "status_code": resp.status_code,
+            "response_headers": dict(resp.headers),
+            "response_body": body,
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[DebugBuiltWith] Error calling %s", url)
+        return {"error": str(e), "url_called": url}
+
+
 @app.get("/test-holehe")
 async def test_holehe(email: str = "test@gmail.com"):
     try:
