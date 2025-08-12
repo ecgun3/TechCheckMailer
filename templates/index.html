@@ -33,6 +33,11 @@
       </div>
 
       <div class="result-block">
+        <h3>All technologies</h3>
+        <div id="tech-raw" class="tech-grid"></div>
+      </div>
+
+      <div class="result-block">
         <h3>Platforms for Email</h3>
         <ul id="platform-list"></ul>
       </div>
@@ -58,6 +63,7 @@
     const statusEl = document.getElementById('status');
     const resultsEl = document.getElementById('results');
     const techCategoriesEl = document.getElementById('tech-categories');
+    const techRawEl = document.getElementById('tech-raw');
     const contextListEl = document.getElementById('context-list');
     const platformListEl = document.getElementById('platform-list');
     const templatesEl = document.getElementById('templates');
@@ -76,6 +82,7 @@
 
     function clearResults() {
       techCategoriesEl.innerHTML = '';
+      techRawEl.innerHTML = '';
       contextListEl.innerHTML = '';
       platformListEl.innerHTML = '';
       templatesEl.innerHTML = '';
@@ -96,6 +103,18 @@
         frag.appendChild(block);
       });
       techCategoriesEl.appendChild(frag);
+    }
+
+    function renderTechRaw(list) {
+      techRawEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      (list || []).forEach(t => {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = t;
+        frag.appendChild(badge);
+      });
+      techRawEl.appendChild(frag);
     }
 
     function renderContexts(contexts) {
@@ -124,7 +143,9 @@
         if (idx === 0) radio.checked = true;
         const label = document.createElement('label');
         label.htmlFor = radio.id;
-        label.textContent = `${tpl.context} — ${tpl.subject}`;
+        // Friendlier label: show context title-cased and subject
+        const niceContext = (tpl.context || '').replace(/\b\w/g, m => m.toUpperCase());
+        label.textContent = `${niceContext} • ${tpl.subject}`;
         wrap.appendChild(radio); wrap.appendChild(label);
         templatesEl.appendChild(wrap);
       });
@@ -142,9 +163,10 @@
     function showResults(data) {
       // also show raw list of technologies if categorization is empty
       const cats = data?.meta?.company_technologies;
-      if (!cats || !Object.keys(cats).length) {
-        renderCategories({ all: (data.technologies || []) });
-      } else {
+      // Always render raw badges for visibility
+      renderTechRaw(data.technologies || []);
+      // Render categories if available; else omit categories block
+      if (cats && Object.keys(cats).length) {
         renderCategories(cats);
       }
       renderContexts(data?.meta?.matched_contexts);
