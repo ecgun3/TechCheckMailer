@@ -85,7 +85,7 @@ def _parse_builtwith_payload(data: dict) -> Set[str]:
                         if cat_name:
                             names.add(cat_name)
 
-    # Alternative shape occasionally seen in examples: { "groups": [ { "categories": [ {"name": ...} ] } ] }
+    # Alternative example: { "groups": [ { "categories": [ {"name": ...} ] } ] }
     if not names and isinstance(data.get("groups"), list):
         for group in data.get("groups", []):
             for cat in group.get("categories", []) or []:
@@ -93,4 +93,37 @@ def _parse_builtwith_payload(data: dict) -> Set[str]:
                 if n:
                     names.add(n)
 
+    # Fallback: recursively search any nested "Technologies" arrays or tech-like objects
+    if not names:
+        names |= _recursive_collect_technology_names(data)
+
     return names
+
+
+def _recursive_collect_technology_names(node) -> Set[str]:
+    collected: Set[str] = set()
+    try:
+        if isinstance(node, dict):
+            # Collect from common keys
+            for key in ("Technologies", "technologies", "Technology", "technology"):
+                if key in node and isinstance(node[key], list):
+                    for tech in node[key]:
+                        if isinstance(tech, dict):
+                            n = tech.get("Name") or tech.get("name") or tech.get("TechnologyName")
+                            if n:
+                                collected.add(n)
+                            for cat_key in ("Categories", "categories"):
+                                for cat in (tech.get(cat_key) or []):
+                                    if isinstance(cat, dict):
+                                        cn = cat.get("Name") or cat.get("name")
+                                        if cn:
+                                            collected.add(cn)
+            # Recurse
+            for v in node.values():
+                collected |= _recursive_collect_technology_names(v)
+        elif isinstance(node, list):
+            for item in node:
+                collected |= _recursive_collect_technology_names(item)
+    except Exception:
+        pass
+    return collected
