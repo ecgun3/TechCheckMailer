@@ -59,20 +59,32 @@ def _service_exists_from_item(item: Any) -> Tuple[str, bool]:
 
 
 async def _check_email_cli(email: str, timeout: int = 120) -> Tuple[Set[str], Dict[str, Any]]:
-    """Invoke Holehe CLI via `python -m holehe` and fallback to `holehe` executable.
+    """Invoke Holehe CLI using multiple strategies and return parsed results.
 
     Returns a tuple: (platforms_found, debug_info)
     """
-    commands = [
-        [sys.executable or "python3", "-m", "holehe", email, "--no-color", "--json"],
+    import shutil
+
+    which_path = shutil.which("holehe")
+    commands = []
+    if which_path:
+        commands += [
+            [which_path, email, "--no-color", "--json"],
+            [which_path, "-j", email],
+        ]
+    # Fallbacks
+    commands += [
         ["holehe", email, "--no-color", "--json"],
-        # Some versions use -j instead of --json
-        [sys.executable or "python3", "-m", "holehe", "-j", email],
         ["holehe", "-j", email],
+        [sys.executable or "python3", "-m", "holehe", email, "--no-color", "--json"],
+        [sys.executable or "python3", "-m", "holehe", "-j", email],
     ]
 
-    last_error = None
+    last_error: Dict[str, Any] | None = None
+    tried: List[List[str]] = []
+
     for cmd in commands:
+        tried.append(cmd)
         logger.info("[Holehe] Running CLI: %s", " ".join(cmd))
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -107,8 +119,13 @@ async def _check_email_cli(email: str, timeout: int = 120) -> Tuple[Set[str], Di
                 _collect_platforms_from_obj(obj, platforms)
 
             logger.info("[Holehe] CLI parsed %d platforms from %d JSON lines", len(platforms), len(raw_items))
-            debug_info = {"cmd": cmd, "num_lines": len(raw_items), "stderr": text_err[:300]}
-            return platforms, debug_info
+            debug_info = {"cmd": cmd, "num_lines": len(raw_items), "stderr": text_err[:300], "tried": tried}
+            # Only accept this attempt if we have data
+            if platforms or raw_items:
+                return platforms, debug_info
+            else:
+                last_error = {"error": "no_json_output", "cmd": cmd, "stderr": text_err[:300]}
+                continue
         except FileNotFoundError as e:
             last_error = {"error": str(e), "cmd": cmd}
             logger.info("[Holehe] CLI not found for cmd: %s", " ".join(cmd))
@@ -117,7 +134,7 @@ async def _check_email_cli(email: str, timeout: int = 120) -> Tuple[Set[str], Di
             logger.warning("[Holehe] CLI failed for cmd %s: %s", " ".join(cmd), e)
 
     logger.error("[Holehe] All CLI attempts failed: %s", last_error)
-    return set(), last_error or {}
+    return set(), (last_error or {"tried": tried})
 
 
 def _collect_platforms_from_obj(obj, platforms: Set[str]) -> None:

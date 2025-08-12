@@ -144,7 +144,15 @@
 
     function renderTemplates(templates) {
       templatesEl.innerHTML = '';
-      (templates || []).forEach((tpl, idx) => {
+      const list = (templates || []);
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = 'No contextual templates available.';
+        templatesEl.appendChild(p);
+        return;
+      }
+      list.forEach((tpl, idx) => {
         const wrap = document.createElement('div');
         wrap.className = 'tpl';
         const radio = document.createElement('input');
@@ -166,6 +174,8 @@
       const tpl = (templates || [])[idx];
       if (tpl) {
         draftEl.value = `Subject: ${tpl.subject}\n\n${tpl.body}`;
+      } else {
+        draftEl.value = '';
       }
     }
 
