@@ -10,6 +10,9 @@ from app.services.builtwith_client import fetch_technologies
 from app.services.holehe_client import check_email_platforms
 from app.email_drafter import generate_email_draft
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app = FastAPI(title="Tech & Email Intelligence")
 
 # Static and templates
