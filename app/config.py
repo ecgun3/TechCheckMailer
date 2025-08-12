@@ -14,6 +14,9 @@ def get_builtwith_api_url() -> str:
 BUILTWITH_TIMEOUT = int(os.getenv("BUILTWITH_TIMEOUT", "20"))
 HOLEHE_TIMEOUT = int(os.getenv("HOLEHE_TIMEOUT", "120"))
 
+# Feature flags
+USE_HOLEHE = os.getenv("USE_HOLEHE", "true").lower() in ("1", "true", "yes")
+USE_MOCK_PLATFORMS = os.getenv("USE_MOCK_PLATFORMS", "true").lower() in ("1", "true", "yes")
 
 # App server config (for reference when using programmatic run)
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")

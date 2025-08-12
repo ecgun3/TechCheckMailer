@@ -12,8 +12,9 @@ import httpx
 from app.models import AnalyzeRequest, AnalyzeResponse
 from app.services.builtwith_client import fetch_technologies
 from app.services.email_platforms import detect_platforms
+from app.services.holehe_client import check_email_platforms, debug_holehe
 from app.email_drafter import generate_email_draft, SmartEmailDrafter
-from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, get_builtwith_api_url
+from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, HOLEHE_TIMEOUT, get_builtwith_api_url, USE_HOLEHE
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -48,6 +49,7 @@ async def validate_env():
     else:
         logger.info("API Key loaded: %s… (len=%d)", api_key[:6], len(api_key))
         logger.info("API URL: %s", get_builtwith_api_url())
+    logger.info("USE_HOLEHE=%s", USE_HOLEHE)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -80,13 +82,11 @@ async def debug_builtwith(domain: str):
     api_key = get_builtwith_api_key()
     if not api_key:
         return {"error": "BUILTWITH_API_KEY missing", "api_key_present": False, "api_key_length": 0}
-    # Force the free endpoint to remove ambiguity
     base = "https://api.builtwith.com/free1/api.json"
     url = f"{base}?KEY={api_key}&LOOKUP={domain}"
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, timeout=30.0)
-        # Log details server-side as well
         logger.info("[DebugBuiltWith] GET %s -> %s", url, resp.status_code)
         body = None
         try:
@@ -105,6 +105,13 @@ async def debug_builtwith(domain: str):
         return {"error": str(e), "url_called": url}
 
 
+@app.get("/test-holehe")
+async def test_holehe(email: str = "test@gmail.com"):
+    try:
+        platforms = await check_email_platforms(email)
+        return {"platforms": platforms}
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
@@ -122,11 +129,18 @@ async def analyze(body: AnalyzeRequest):
         technologies_task = None
         warnings.append(f"Skipping BuiltWith due to initialization error: {exc}")
 
-    # Detect platforms without external APIs
-    platforms = detect_platforms(body.email, body.domain)
+    # Platforms: Holehe (if enabled) → fallback to email-domain detection
+    platforms: List[str] = []
+    try:
+        if USE_HOLEHE:
+            platforms = await check_email_platforms(body.email, timeout=120)
+    except Exception as exc:
+        warnings.append(f"Holehe failed: {exc}")
+    if not platforms:
+        from app.services.email_platforms import detect_platforms as fallback_detect
+        platforms = fallback_detect(body.email, body.domain)
 
-    technologies = []
-
+    technologies: List[str] = []
     try:
         if technologies_task:
             technologies = await technologies_task
@@ -136,7 +150,7 @@ async def analyze(body: AnalyzeRequest):
     if not technologies:
         warnings.append("No technologies detected from BuiltWith. The site may block the API or no data is available.")
     if not platforms:
-        warnings.append("No platforms found for this email. It may be private or rate-limited.")
+        warnings.append("No platforms found for this email.")
 
     categorized = smart_drafter.categorize_technologies(technologies)
     matched_contexts = smart_drafter.match_platform_contexts(platforms, categorized)
