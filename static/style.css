@@ -35,10 +35,12 @@ button {
   cursor: pointer;
 }
 button:hover { background: #2f4ce0; }
-.status { margin-top: 16px; padding: 8px 12px; border-radius: 8px; background: #0f1430; border: 1px solid #2a355c; }
+.status { margin-top: 16px; padding: 8px 12px; border-radius: 8px; background: #0f1430; border: 1px solid #2a355c; white-space: pre-line; }
 .status.success { border-color: #2bc48a; }
 .status.error { border-color: #ff557a; }
 .results { margin-top: 24px; }
+.spinner { display: inline-block; width: 18px; height: 18px; margin-left: 12px; border: 3px solid #2a355c; border-top-color: #3a5cff; border-radius: 50%; animation: spin 0.9s linear infinite; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .result-block { margin: 16px 0; }
 #draft { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2a355c; background: #0f1430; color: #e6e6ef; }
 .hidden { display: none; }

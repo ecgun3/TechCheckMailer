@@ -26,13 +26,13 @@ def _is_retryable(exc: Exception) -> bool:
     and e.response.status_code not in (429, 500, 502, 503, 504),
     jitter=backoff.full_jitter,
 )
-async def _fetch(client: httpx.AsyncClient, url: str, params: dict) -> dict:
-    resp = await client.get(url, params=params, timeout=20)
+async def _fetch(client: httpx.AsyncClient, url: str, params: dict, timeout_s: int) -> dict:
+    resp = await client.get(url, params=params, timeout=timeout_s)
     resp.raise_for_status()
     return resp.json()
 
 
-async def fetch_technologies(domain: str, api_key: str) -> List[str]:
+async def fetch_technologies(domain: str, api_key: str, timeout_s: int = None) -> List[str]:
     """Fetch technologies used by a domain via BuiltWith.
 
     Returns a sorted list of technology and category names. Handles multiple
@@ -41,8 +41,12 @@ async def fetch_technologies(domain: str, api_key: str) -> List[str]:
     url = os.getenv("BUILTWITH_API_URL", API_URL_DEFAULT)
     params = {"KEY": api_key, "LOOKUP": domain}
 
+    if timeout_s is None:
+        from app.config import BUILTWITH_TIMEOUT as timeout_default
+        timeout_s = timeout_default
+
     async with httpx.AsyncClient() as client:
-        data = await _fetch(client, url, params)
+        data = await _fetch(client, url, params, timeout_s)
 
     technologies = _parse_builtwith_payload(data)
     return sorted(technologies)

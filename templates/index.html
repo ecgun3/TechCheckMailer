@@ -13,15 +13,16 @@
 
     <form id="analyze-form">
       <label for="domain">Domain</label>
-      <input id="domain" name="domain" placeholder="example.com" required />
+      <input id="domain" name="domain" placeholder="e.g. example.com" required />
 
       <label for="email">Email</label>
-      <input id="email" name="email" type="email" placeholder="user@example.com" required />
+      <input id="email" name="email" type="email" placeholder="e.g. user@example.com" required />
 
       <button type="submit">Analyze</button>
+      <div class="spinner hidden" id="spinner" aria-live="polite" aria-label="Loading"></div>
     </form>
 
-    <div id="status" class="status"></div>
+    <div id="status" class="status" role="alert"></div>
 
     <section id="results" class="results hidden">
       <h2>Results</h2>
@@ -38,7 +39,10 @@
 
       <div class="result-block">
         <h3>Personalized Email Draft</h3>
-        <textarea id="draft" rows="10"></textarea>
+        <div class="draft-actions">
+          <button id="copy-draft" type="button">Copy</button>
+        </div>
+        <textarea id="draft" rows="10" placeholder="Your generated email will appear here..."></textarea>
       </div>
     </section>
   </div>
@@ -51,9 +55,15 @@
     const platformListEl = document.getElementById('platform-list');
     const draftEl = document.getElementById('draft');
 
+    const spinner = document.getElementById('spinner');
+
     function setStatus(text, kind = 'info') {
       statusEl.textContent = text;
       statusEl.className = `status ${kind}`;
+    }
+
+    function setLoading(isLoading) {
+      spinner.classList.toggle('hidden', !isLoading);
     }
 
     function clearResults() {
@@ -82,6 +92,7 @@
       e.preventDefault();
       clearResults();
       setStatus('Analyzing… This can take ~10–30s depending on rate limits.', 'info');
+      setLoading(true);
       const domain = document.getElementById('domain').value.trim();
       const email = document.getElementById('email').value.trim();
 
@@ -92,15 +103,36 @@
           body: JSON.stringify({ domain, email })
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-          throw new Error(err.detail || 'Request failed');
+          let msg = 'Request failed';
+          try {
+            const err = await res.json();
+            msg = err.detail || err.message || msg;
+          } catch {}
+          throw new Error(msg);
         }
         const data = await res.json();
-        setStatus('Done', 'success');
+        if (data.warnings && data.warnings.length) {
+          setStatus(data.warnings.join(' \n'), 'info');
+        } else {
+          setStatus('Done', 'success');
+        }
         showResults(data);
       } catch (err) {
         console.error(err);
         setStatus(err.message || 'Something went wrong', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    document.getElementById('copy-draft').addEventListener('click', async () => {
+      const text = draftEl.value || '';
+      if (!text) { setStatus('Nothing to copy yet.', 'info'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus('Draft copied to clipboard.', 'success');
+      } catch {
+        setStatus('Failed to copy. Select and copy manually.', 'error');
       }
     });
   </script>
