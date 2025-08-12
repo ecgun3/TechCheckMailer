@@ -28,6 +28,11 @@ def _is_retryable(exc: Exception) -> bool:
 )
 async def _fetch(client: httpx.AsyncClient, url: str, params: dict, timeout_s: int) -> dict:
     resp = await client.get(url, params=params, timeout=timeout_s)
+    logger.info(
+        "BuiltWith response: status=%s url=%s",
+        resp.status_code,
+        resp.request.url if resp.request else url,
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -45,10 +50,15 @@ async def fetch_technologies(domain: str, api_key: str, timeout_s: int = None) -
         from app.config import BUILTWITH_TIMEOUT as timeout_default
         timeout_s = timeout_default
 
+    masked_key = (api_key[:4] + "…") if api_key else "(none)"
+    logger.info("Making BuiltWith API call for domain=%s url=%s key=%s", domain, url, masked_key)
+
     async with httpx.AsyncClient() as client:
         data = await _fetch(client, url, params, timeout_s)
 
     technologies = _parse_builtwith_payload(data)
+    logger.info("Parsed %d technologies/categories from BuiltWith for %s", len(technologies), domain)
+    logger.debug("BuiltWith raw keys: %s", list(data.keys()) if isinstance(data, dict) else type(data))
     return sorted(technologies)
 
 

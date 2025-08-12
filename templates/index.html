@@ -157,6 +157,7 @@
       const email = document.getElementById('email').value.trim();
 
       try {
+        console.log('Sending request to backend:', { domain, email });
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -171,6 +172,7 @@
           throw new Error(msg);
         }
         const data = await res.json();
+        console.log('Backend response data:', data);
         if (data.warnings && data.warnings.length) {
           setStatus(data.warnings.join(' \n'), 'info');
         } else {
