@@ -11,9 +11,9 @@ import httpx
 
 from app.models import AnalyzeRequest, AnalyzeResponse
 from app.services.builtwith_client import fetch_technologies
-from app.services.holehe_client import check_email_platforms, debug_holehe
+from app.services.email_platforms import detect_platforms
 from app.email_drafter import generate_email_draft, SmartEmailDrafter
-from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, HOLEHE_TIMEOUT, get_builtwith_api_url
+from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, get_builtwith_api_url
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -105,13 +105,6 @@ async def debug_builtwith(domain: str):
         return {"error": str(e), "url_called": url}
 
 
-@app.get("/test-holehe")
-async def test_holehe(email: str = "test@gmail.com"):
-    try:
-        details = await debug_holehe(email)
-        return details
-    except Exception as e:  # noqa: BLE001
-        return {"error": str(e)}
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
@@ -129,21 +122,16 @@ async def analyze(body: AnalyzeRequest):
         technologies_task = None
         warnings.append(f"Skipping BuiltWith due to initialization error: {exc}")
 
-    platforms_task = asyncio.create_task(check_email_platforms(body.email, timeout=HOLEHE_TIMEOUT))
+    # Detect platforms without external APIs
+    platforms = detect_platforms(body.email, body.domain)
 
     technologies = []
-    platforms = []
 
     try:
         if technologies_task:
             technologies = await technologies_task
     except Exception as exc:
         warnings.append(f"BuiltWith lookup failed: {exc}")
-
-    try:
-        platforms = await platforms_task
-    except Exception as exc:
-        warnings.append(f"Email check failed: {exc}")
 
     if not technologies:
         warnings.append("No technologies detected from BuiltWith. The site may block the API or no data is available.")
