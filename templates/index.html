@@ -28,8 +28,8 @@
       <h2>Results</h2>
 
       <div class="result-block">
-        <h3>Technologies</h3>
-        <ul id="tech-list"></ul>
+        <h3>Technologies (categorized)</h3>
+        <div id="tech-categories"></div>
       </div>
 
       <div class="result-block">
@@ -38,11 +38,17 @@
       </div>
 
       <div class="result-block">
-        <h3>Personalized Email Draft</h3>
+        <h3>Matched Contexts</h3>
+        <ul id="context-list"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>Templates</h3>
+        <div id="templates"></div>
         <div class="draft-actions">
-          <button id="copy-draft" type="button">Copy</button>
+          <button id="copy-draft" type="button">Copy Selected</button>
         </div>
-        <textarea id="draft" rows="10" placeholder="Your generated email will appear here..."></textarea>
+        <textarea id="draft" rows="10" placeholder="Select a template to preview or edit..."></textarea>
       </div>
     </section>
   </div>
@@ -51,8 +57,10 @@
     const form = document.getElementById('analyze-form');
     const statusEl = document.getElementById('status');
     const resultsEl = document.getElementById('results');
-    const techListEl = document.getElementById('tech-list');
+    const techCategoriesEl = document.getElementById('tech-categories');
+    const contextListEl = document.getElementById('context-list');
     const platformListEl = document.getElementById('platform-list');
+    const templatesEl = document.getElementById('templates');
     const draftEl = document.getElementById('draft');
 
     const spinner = document.getElementById('spinner');
@@ -67,24 +75,76 @@
     }
 
     function clearResults() {
-      techListEl.innerHTML = '';
+      techCategoriesEl.innerHTML = '';
+      contextListEl.innerHTML = '';
       platformListEl.innerHTML = '';
+      templatesEl.innerHTML = '';
       draftEl.value = '';
       resultsEl.classList.add('hidden');
     }
 
-    function showResults(data) {
-      data.technologies.forEach(t => {
-        const li = document.createElement('li');
-        li.textContent = t;
-        techListEl.appendChild(li);
+    function renderCategories(cats) {
+      const frag = document.createDocumentFragment();
+      Object.entries(cats || {}).forEach(([cat, items]) => {
+        const block = document.createElement('div');
+        block.className = 'cat-block';
+        const title = document.createElement('h4');
+        title.textContent = cat;
+        const ul = document.createElement('ul');
+        items.forEach(it => { const li = document.createElement('li'); li.textContent = it; ul.appendChild(li); });
+        block.appendChild(title); block.appendChild(ul);
+        frag.appendChild(block);
       });
-      data.platforms_found.forEach(p => {
+      techCategoriesEl.appendChild(frag);
+    }
+
+    function renderContexts(contexts) {
+      (contexts || []).forEach(c => {
+        const li = document.createElement('li');
+        li.textContent = c;
+        contextListEl.appendChild(li);
+      });
+    }
+
+    function renderPlatforms(platforms) {
+      (platforms || []).forEach(p => {
         const li = document.createElement('li');
         li.textContent = p;
         platformListEl.appendChild(li);
       });
-      draftEl.value = data.email_draft;
+    }
+
+    function renderTemplates(templates) {
+      templatesEl.innerHTML = '';
+      (templates || []).forEach((tpl, idx) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'tpl';
+        const radio = document.createElement('input');
+        radio.type = 'radio'; radio.name = 'tpl'; radio.id = `tpl-${idx}`; radio.value = idx;
+        if (idx === 0) radio.checked = true;
+        const label = document.createElement('label');
+        label.htmlFor = radio.id;
+        label.textContent = `${tpl.context} — ${tpl.subject}`;
+        wrap.appendChild(radio); wrap.appendChild(label);
+        templatesEl.appendChild(wrap);
+      });
+    }
+
+    function applySelectedTemplate(templates) {
+      const selected = document.querySelector('input[name="tpl"]:checked');
+      const idx = selected ? parseInt(selected.value, 10) : 0;
+      const tpl = (templates || [])[idx];
+      if (tpl) {
+        draftEl.value = `Subject: ${tpl.subject}\n\n${tpl.body}`;
+      }
+    }
+
+    function showResults(data) {
+      renderCategories(data?.meta?.company_technologies);
+      renderContexts(data?.meta?.matched_contexts);
+      renderPlatforms(data.platforms_found);
+      renderTemplates(data?.meta?.generated_templates);
+      applySelectedTemplate(data?.meta?.generated_templates);
       resultsEl.classList.remove('hidden');
     }
 

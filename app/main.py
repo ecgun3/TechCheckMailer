@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from app.models import AnalyzeRequest, AnalyzeResponse
 from app.services.builtwith_client import fetch_technologies
 from app.services.holehe_client import check_email_platforms
-from app.email_drafter import generate_email_draft
+from app.email_drafter import generate_email_draft, SmartEmailDrafter
 from app.config import get_builtwith_api_key, BUILTWITH_TIMEOUT, HOLEHE_TIMEOUT
 
 from dotenv import load_dotenv
@@ -20,11 +20,12 @@ app = FastAPI(title="Tech & Email Intelligence")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+smart_drafter = SmartEmailDrafter()
+
 
 @app.on_event("startup")
 async def validate_env():
     if not get_builtwith_api_key():
-        # Log-only; user will see friendly error upon request
         import logging
         logging.getLogger(__name__).warning("BUILTWITH_API_KEY missing. Requests will fail until configured.")
 
@@ -70,7 +71,18 @@ async def analyze(body: AnalyzeRequest):
     if not platforms:
         warnings.append("No platforms found for this email. It may be private or rate-limited.")
 
-    email_draft = generate_email_draft(
+    # Smart templates and context
+    categorized = smart_drafter.categorize_technologies(technologies)
+    matched_contexts = smart_drafter.match_platform_contexts(platforms, categorized)
+    generated_templates, contexts_used = smart_drafter.generate_templates(
+        domain=body.domain,
+        email=body.email,
+        technologies=technologies,
+        platforms=platforms,
+    )
+
+    # Backward-compatible fields + new fields via meta
+    email_draft = generated_templates[0]["body"] if generated_templates else generate_email_draft(
         domain=body.domain,
         email=body.email,
         technologies=technologies,
@@ -83,4 +95,10 @@ async def analyze(body: AnalyzeRequest):
         email_draft=email_draft,
         warnings=warnings or None,
         errors=errors or None,
+        meta={
+            "company_technologies": categorized,
+            "email_platforms": platforms,
+            "matched_contexts": matched_contexts,
+            "generated_templates": generated_templates,
+        },
     )

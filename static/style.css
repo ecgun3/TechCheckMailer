@@ -43,4 +43,6 @@ button:hover { background: #2f4ce0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .result-block { margin: 16px 0; }
 #draft { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2a355c; background: #0f1430; color: #e6e6ef; }
+.cat-block { border: 1px dashed #2a355c; padding: 8px 12px; border-radius: 8px; margin: 8px 0; }
+.tpl { margin: 6px 0; display: flex; gap: 8px; align-items: center; }
 .hidden { display: none; }
