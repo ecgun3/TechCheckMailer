@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tech & Email Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Tech & Email Intelligence</h1>
+    <p class="subtitle">BuiltWith + Holehe</p>
+
+    <form id="analyze-form">
+      <label for="domain">Domain</label>
+      <input id="domain" name="domain" placeholder="example.com" required />
+
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" placeholder="user@example.com" required />
+
+      <button type="submit">Analyze</button>
+    </form>
+
+    <div id="status" class="status"></div>
+
+    <section id="results" class="results hidden">
+      <h2>Results</h2>
+
+      <div class="result-block">
+        <h3>Technologies</h3>
+        <ul id="tech-list"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>Platforms for Email</h3>
+        <ul id="platform-list"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>Personalized Email Draft</h3>
+        <textarea id="draft" rows="10"></textarea>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById('analyze-form');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const techListEl = document.getElementById('tech-list');
+    const platformListEl = document.getElementById('platform-list');
+    const draftEl = document.getElementById('draft');
+
+    function setStatus(text, kind = 'info') {
+      statusEl.textContent = text;
+      statusEl.className = `status ${kind}`;
+    }
+
+    function clearResults() {
+      techListEl.innerHTML = '';
+      platformListEl.innerHTML = '';
+      draftEl.value = '';
+      resultsEl.classList.add('hidden');
+    }
+
+    function showResults(data) {
+      data.technologies.forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = t;
+        techListEl.appendChild(li);
+      });
+      data.platforms_found.forEach(p => {
+        const li = document.createElement('li');
+        li.textContent = p;
+        platformListEl.appendChild(li);
+      });
+      draftEl.value = data.email_draft;
+      resultsEl.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearResults();
+      setStatus('Analyzing… This can take ~10–30s depending on rate limits.', 'info');
+      const domain = document.getElementById('domain').value.trim();
+      const email = document.getElementById('email').value.trim();
+
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain, email })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+          throw new Error(err.detail || 'Request failed');
+        }
+        const data = await res.json();
+        setStatus('Done', 'success');
+        showResults(data);
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'Something went wrong', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
