@@ -80,5 +80,23 @@ docker run -p 8000:8000 --env BUILTWITH_API_KEY=YOUR_KEY tech-email-intel
 - Heroku: `Procfile` provided. Set `BUILTWITH_API_KEY` as a config var.
 - Render/Railway/Fly.io: Create a service from this repo, set `BUILTWITH_API_KEY`, command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 
+## Using a local Holehe clone
+If you prefer using a local clone instead of PyPI:
+```bash
+git clone https://github.com/megadose/holehe.git
+cd holehe
+python3 setup.py install  # installs console script 'holehe' into your active venv
+```
+If the console script is not on PATH or you want to point explicitly, set:
+```bash
+export HOLEHE_BIN=/absolute/path/to/holehe   # e.g., /Users/you/holehe/venv/bin/holehe or venv/bin/holehe
+export USE_HOLEHE=true
+```
+Then run the server and test the endpoint:
+```bash
+uvicorn app.main:app --reload
+open http://localhost:8000/test-holehe?email=test%40gmail.com
+```
+
 ## Disclaimer
 - Use responsibly. Respect terms of service and rate limits of all services.

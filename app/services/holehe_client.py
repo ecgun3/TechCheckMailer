@@ -49,12 +49,19 @@ def _service_exists_from_item(item: Any) -> Tuple[str, bool]:
 
 
 async def _check_email_cli(email: str, timeout: int = 120) -> Tuple[Set[str], Dict[str, Any]]:
-    import shutil
+    import shutil, os
+
+    commands = []
+    # Highest priority: explicit path via env
+    holehe_bin = os.getenv("HOLEHE_BIN")
+    if holehe_bin:
+        commands += [[holehe_bin, email, "--no-color", "--json"], [holehe_bin, "-j", email]]
 
     which_path = shutil.which("holehe")
-    commands = []
     if which_path:
         commands += [[which_path, email, "--no-color", "--json"], [which_path, "-j", email]]
+
+    # Fallbacks
     commands += [
         ["holehe", email, "--no-color", "--json"],
         ["holehe", "-j", email],
