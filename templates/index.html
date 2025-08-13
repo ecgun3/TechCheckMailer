@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tech & Email Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+</head>
+<body>
+  <div class="container">
+    <h1>Tech & Email Intelligence</h1>
+    <p class="subtitle">BuiltWith + Holehe</p>
+
+    <form id="analyze-form">
+      <label for="domain">Domain</label>
+      <input id="domain" name="domain" placeholder="e.g. example.com" required />
+
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" placeholder="e.g. user@example.com" required />
+
+      <button type="submit">Analyze</button>
+      <div class="spinner hidden" id="spinner" aria-live="polite" aria-label="Loading"></div>
+    </form>
+
+    <div id="status" class="status" role="alert"></div>
+
+    <section id="results" class="results hidden">
+      <h2>Results</h2>
+
+      <div class="result-block">
+        <h3>Technologies (categorized)</h3>
+        <div id="tech-categories"></div>
+      </div>
+
+      <div class="result-block">
+        <h3>All technologies</h3>
+        <div id="tech-raw" class="tech-grid"></div>
+      </div>
+
+      <div class="result-block">
+        <h3>Platforms for Email</h3>
+        <ul id="platform-list"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>Matched Contexts</h3>
+        <ul id="context-list"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>Templates</h3>
+        <div id="templates"></div>
+        <div class="draft-actions">
+          <button id="copy-draft" type="button">Copy Selected</button>
+        </div>
+        <textarea id="draft" rows="10" placeholder="Select a template to preview or edit..."></textarea>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    console.log('UI version v2 loaded');
+    const form = document.getElementById('analyze-form');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const techCategoriesEl = document.getElementById('tech-categories');
+    const techRawEl = document.getElementById('tech-raw');
+    const contextListEl = document.getElementById('context-list');
+    const platformListEl = document.getElementById('platform-list');
+    const templatesEl = document.getElementById('templates');
+    const draftEl = document.getElementById('draft');
+
+    const spinner = document.getElementById('spinner');
+
+    function setStatus(text, kind = 'info') {
+      statusEl.textContent = text;
+      statusEl.className = `status ${kind}`;
+    }
+
+    function setLoading(isLoading) {
+      spinner.classList.toggle('hidden', !isLoading);
+    }
+
+    function clearResults() {
+      techCategoriesEl.innerHTML = '';
+      techRawEl.innerHTML = '';
+      contextListEl.innerHTML = '';
+      platformListEl.innerHTML = '';
+      templatesEl.innerHTML = '';
+      draftEl.value = '';
+      resultsEl.classList.add('hidden');
+    }
+
+    function renderCategories(cats) {
+      const frag = document.createDocumentFragment();
+      Object.entries(cats || {}).forEach(([cat, items]) => {
+        const block = document.createElement('div');
+        block.className = 'cat-block';
+        const title = document.createElement('h4');
+        title.textContent = cat;
+        const ul = document.createElement('ul');
+        items.forEach(it => { const li = document.createElement('li'); li.textContent = it; ul.appendChild(li); });
+        block.appendChild(title); block.appendChild(ul);
+        frag.appendChild(block);
+      });
+      techCategoriesEl.appendChild(frag);
+    }
+
+    function renderTechRaw(list) {
+      techRawEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      (list || []).forEach(t => {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = t;
+        frag.appendChild(badge);
+      });
+      techRawEl.appendChild(frag);
+    }
+
+    function renderContexts(contexts) {
+      (contexts || []).forEach(c => {
+        const li = document.createElement('li');
+        li.textContent = c;
+        contextListEl.appendChild(li);
+      });
+    }
+
+    function renderPlatforms(platforms) {
+      platformListEl.innerHTML = '';
+      if (!platforms || !platforms.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No platforms detected';
+        li.className = 'muted';
+        platformListEl.appendChild(li);
+        return;
+      }
+      (platforms || []).forEach(p => {
+        const li = document.createElement('li');
+        li.textContent = p;
+        platformListEl.appendChild(li);
+      });
+    }
+
+    function renderTemplates(templates) {
+      templatesEl.innerHTML = '';
+      const list = (templates || []);
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = 'No contextual templates available.';
+        templatesEl.appendChild(p);
+        return;
+      }
+      list.forEach((tpl, idx) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'tpl';
+        const radio = document.createElement('input');
+        radio.type = 'radio'; radio.name = 'tpl'; radio.id = `tpl-${idx}`; radio.value = idx;
+        if (idx === 0) radio.checked = true;
+        const label = document.createElement('label');
+        label.htmlFor = radio.id;
+        // Friendlier label: show context title-cased and subject
+        const niceContext = (tpl.context || '').replace(/\b\w/g, m => m.toUpperCase());
+        label.textContent = `${niceContext} • ${tpl.subject}`;
+        wrap.appendChild(radio); wrap.appendChild(label);
+        templatesEl.appendChild(wrap);
+      });
+    }
+
+    function applySelectedTemplate(templates) {
+      const selected = document.querySelector('input[name="tpl"]:checked');
+      const idx = selected ? parseInt(selected.value, 10) : 0;
+      const tpl = (templates || [])[idx];
+      if (tpl) {
+        draftEl.value = `Subject: ${tpl.subject}\n\n${tpl.body}`;
+      } else {
+        draftEl.value = '';
+      }
+    }
+
+    function showResults(data) {
+      // also show raw list of technologies if categorization is empty
+      const cats = data?.meta?.company_technologies;
+      // Always render raw badges for visibility
+      renderTechRaw(data.technologies || []);
+      // Render categories if available; else omit categories block
+      if (cats && Object.keys(cats).length) {
+        renderCategories(cats);
+      }
+      renderContexts(data?.meta?.matched_contexts);
+      renderPlatforms(data.platforms_found);
+      renderTemplates((data?.meta?.generated_templates || []).filter(t => t.context !== 'general'));
+      applySelectedTemplate((data?.meta?.generated_templates || []).filter(t => t.context !== 'general'));
+      resultsEl.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearResults();
+      setStatus('Analyzing… This can take ~10–30s depending on rate limits.', 'info');
+      setLoading(true);
+      const domain = document.getElementById('domain').value.trim();
+      const email = document.getElementById('email').value.trim();
+
+      try {
+        console.log('Sending request to backend:', { domain, email });
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain, email })
+        });
+        if (!res.ok) {
+          let msg = 'Request failed';
+          try {
+            const err = await res.json();
+            msg = err.detail || err.message || msg;
+          } catch {}
+          throw new Error(msg);
+        }
+        const data = await res.json();
+        console.log('Backend response data:', data);
+        if (data.warnings && data.warnings.length) {
+          setStatus(data.warnings.join(' \n'), 'info');
+        } else {
+          setStatus('Done', 'success');
+        }
+        showResults(data);
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'Something went wrong', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    document.getElementById('copy-draft').addEventListener('click', async () => {
+      const text = draftEl.value || '';
+      if (!text) { setStatus('Nothing to copy yet.', 'info'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus('Draft copied to clipboard.', 'success');
+      } catch {
+        setStatus('Failed to copy. Select and copy manually.', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
